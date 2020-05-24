@@ -15,10 +15,3 @@ struct Query
 };
 
 typedef u32 (*ValidateQueryFunction) (Query&, Book&);
-// TODO
-#if 0
-class QueryValidatorTable
-{
-    static const ValidateQueryFunction*;
-}
-#endif

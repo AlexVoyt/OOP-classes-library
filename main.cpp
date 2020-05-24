@@ -2,10 +2,10 @@
 #include <iostream>
 #include <vector>
 #include <stdint.h>
+#include <assert.h>
 #pragma warning(pop)
 
 #define DEBUG
-
 
 typedef int8_t  s8;
 typedef int16_t s16;
@@ -24,6 +24,11 @@ struct AuthorID
 {
     std::string name;
     std::string surname;
+
+    bool operator==(AuthorID &other)
+    {
+        return (name == other.name) && (surname == other.surname);
+    }
 };
 
 // TODO: use this because I can't just OR Genre variables and get Genre type
@@ -66,9 +71,12 @@ std::ostream& operator<<(std::ostream& os, Genre g)
     return os;
 }
 
+//TODO: get rid of it
+struct Query;
+
 class Book
 {
-    protected:
+    public:
     AuthorID    author_id;
     std::string name;
     Genre       genre;
@@ -100,6 +108,8 @@ class Book
     }
 
     friend std::ostream& operator<<(std::ostream &os, Book &b);
+    friend u32 Validate_ALL_Query(Query &query, Book &book);
+    friend u32 Validate_OR_Query(Query &query, Book &book);
 };
 
 //OPTIMIZE: very high data duplication
@@ -165,7 +175,7 @@ class Library
     public:
     void Print()
     {
-        for(u64 i = 0, len = books.size(); i < len; i++)
+        for(u32 i = 0, len = books.size(); i < len; i++)
         {
             std::cout << books[i];
         }
@@ -173,28 +183,34 @@ class Library
 };
 
 
-std::vector<PhysBook &> Fill_Response(Query &query, Library &lib)
+#if 1
+std::vector<PhysBook> Create_Response(Query &query, Library &lib)
 {
 #ifdef DEBUG
     assert(query.type != UNDEFINED);
 #endif
 
-    u32 (*vaildate_function);
+    ValidateQueryFunction validate_function = ValidateQueryFunctionTable[query.type];
 
-    std::vector<PhysBook &> result;
+    std::vector<PhysBook> result;
     for(auto &book : lib.books)
     {
-        if(query.type ==)
+        if(validate_function(query, book))
+        {
+            result.push_back(book);
+        }
     }
 
     return result;
     //TODO;
 }
+#endif
 
 class Person
 {
     std::vector<PhysBook> taken_books;
 
+    public:
     void Interact_With_Lib(Query &query, Library &lib)
     {
         if(query.type == UNDEFINED)
@@ -215,8 +231,12 @@ class Person
             } while (!query.type);
         }
 
-        std::vector<PhysBook> response = Fill_Response(query, lib);
+        std::vector<PhysBook> response = Create_Response(query, lib);
 
+        for(u32 i = 0; i < response.size(); i++)
+        {
+            std::cout << response[i] << std::endl;
+        }
     }
 };
 
@@ -254,6 +274,13 @@ void Library::DEBUG_Fill_Library_With_Books()
     book = PhysBook(author_id, name, genre);
     books.push_back(book);
 
+    author_id.name = "Joanne";
+    author_id.surname = "Rowling";
+    genre = FANTASY;
+    name = "Harry Potter: Last Book";
+    book = PhysBook(author_id, name, genre);
+    books.push_back(book);
+
     author_id.name = "John";
     author_id.surname = "Smith";
     genre = DETECTIVE;
@@ -269,6 +296,21 @@ int main()
     Library lib;
     lib.DEBUG_Fill_Library_With_Books();
     lib.Print();
+
+    Person p;
+
+    AuthorID    author_id;
+    std::string name;
+    Genre       genre;
+    author_id.name = "Joanne";
+    author_id.surname = "Rowling";
+    genre = FANTASY;
+    name = "Harry Potter: First Book";
+    Book book(author_id, name, genre);
+
+    std::cout << "===========================================" << std::endl;
+    Query q(AND, book);
+    p.Interact_With_Lib(q, lib);
     return 0;
 }
 
