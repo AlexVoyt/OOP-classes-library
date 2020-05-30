@@ -108,25 +108,31 @@ class Book
     }
 
     friend std::ostream& operator<<(std::ostream &os, Book &b);
+    // TODO: I think this is not very OOP, ask about callback functions in OOP
     friend u32 Validate_ALL_Query(Query &query, Book &book);
     friend u32 Validate_OR_Query(Query &query, Book &book);
 };
 
-//OPTIMIZE: very high data duplication
+// OPTIMIZE: for now, physbooks might have a lot of data in common
 class PhysBook : public Book
 {
-    // NOTE: overflow possible
-    // I don`t know, I do not like this yet, have no control over this
-    // implementation (for example, manipulating with ids, like destructing books)
+    // NOTE: overflow possible (what can i do?)
     static u32 global_book_id_counter;
     // Each book has unique id
     BookID book_id;
 
     void Print(std::ostream &os)
     {
+        Book::Print(os);
+    }
+
+#ifdef DEV
+    void DEBUG_Print(std::ostream &os)
+    {
         os << book_id <<std::endl;
         Book::Print(os);
     }
+#endif
 
     public:
     PhysBook(AuthorID _author_id, std::string _name, Genre _genre) :
@@ -144,6 +150,11 @@ class PhysBook : public Book
         author_id = pb.author_id;
         genre = pb.genre;
     }
+
+    u32 Get_Book_Id()
+    {
+        return book_id;
+    }
 };
 
 std::ostream& operator<<(std::ostream& os, Book &b)
@@ -158,19 +169,29 @@ class Author
     // Some functionality
 };
 
-//TODO: decide incldue sequence
+// TODO: decide include sequence
 #include "Query.cpp"
+
+enum BookState
+{
+    ON_HANDS = 0,
+    IN_LIB = 1,
+};
 
 class Library
 {
-    // We need some container for book
+    // We need some container for books
     // For simplicity purpose, we just use dynamic array
     // We might change this any time
 #ifdef DEBUG
     public:
     void DEBUG_Fill_Library_With_Books();
 #endif
+
     std::vector<PhysBook> books;
+    // NOTE: since each book has unique id and it is sequential, we can use it as an index
+    // for marking if book is in the library
+    std::vector<BookState> states;
 
     public:
     void Print()
@@ -179,12 +200,23 @@ class Library
         {
             std::cout << books[i];
         }
+
+        for(u32 i = 0, len = states.size(); i < len; i++)
+        {
+            std::cout << states[i];
+        }
+        std::cout << std::endl;
+    }
+
+    void Add_Book(PhysBook& book)
+    {
+        books.push_back(book);
+        states.push_back(IN_LIB);
     }
 };
 
 
-#if 1
-std::vector<PhysBook> Create_Response(Query &query, Library &lib)
+std::vector<PhysBook *> Create_Response(Query &query, Library &lib)
 {
 #ifdef DEBUG
     assert(query.type != UNDEFINED);
@@ -192,25 +224,24 @@ std::vector<PhysBook> Create_Response(Query &query, Library &lib)
 
     ValidateQueryFunction validate_function = ValidateQueryFunctionTable[query.type];
 
-    std::vector<PhysBook> result;
+    std::vector<PhysBook *> result;
     for(auto &book : lib.books)
     {
         if(validate_function(query, book))
         {
-            result.push_back(book);
+            result.push_back(&book);
         }
     }
 
     return result;
-    //TODO;
 }
-#endif
 
 class Person
 {
-    std::vector<PhysBook> taken_books;
+    std::vector<PhysBook *> taken_books;
 
     public:
+
     void Interact_With_Lib(Query &query, Library &lib)
     {
         if(query.type == UNDEFINED)
@@ -219,7 +250,7 @@ class Person
             do
             {
                 QueryType type;
-                // TODO:(10.05.2020) I cant just cin type because there is no overloaded >> operator (ew), fix this one day
+                // TODO:(10.05.2020) I cant just cin type because there is no overloaded >> operator (ew)
                 u32 stub_var;
                 std::cin >> stub_var;
                 type = static_cast<QueryType>(stub_var);
@@ -231,15 +262,39 @@ class Person
             } while (!query.type);
         }
 
-        std::vector<PhysBook> response = Create_Response(query, lib);
+        std::vector<PhysBook *> response = Create_Response(query, lib);
+        u32 len = response.size();
 
-        for(u32 i = 0; i < response.size(); i++)
+        if(len != 0)
         {
-            std::cout << response[i] << std::endl;
+            std::cout << "What book do you want to add?" << std::endl;
+            for(u32 i = 0; i < len; i++)
+            {
+                std::cout << i << std::endl;
+                std::cout << *(response[i]) << std::endl;
+            }
+            u32 choice;
+            std::cin >> choice;
+            while(choice >= len)
+            {
+                std::cout << "Incorrect choice, repeat" << std::endl;
+                std::cin >> choice;
+            }
+
+            PhysBook* chosen_book = response[choice];
+            taken_books.push_back(chosen_book);
+            lib.states[chosen_book->Get_Book_Id()] = ON_HANDS;
+            return;
+        }
+        else
+        {
+            std::cout << "Sorry, we haven't found book that suit your query." << std::endl;
+            return;
         }
     }
 };
 
+#ifdef DEBUG
 void Library::DEBUG_Fill_Library_With_Books()
 {
     AuthorID    author_id;
@@ -251,44 +306,45 @@ void Library::DEBUG_Fill_Library_With_Books()
     genre = FANTASY;
     name = "Dark Tower";
     PhysBook book = PhysBook(author_id, name, genre);
-    books.push_back(book);
+    Add_Book(book);
 
     author_id.name = "Joanne";
     author_id.surname = "Rowling";
     genre = FANTASY;
     name = "Harry Potter: First Book";
     book = PhysBook(author_id, name, genre);
-    books.push_back(book);
+    Add_Book(book);
 
     author_id.name = "Joanne";
     author_id.surname = "Rowling";
     genre = FANTASY;
     name = "Harry Potter: First Book";
     book = PhysBook(author_id, name, genre);
-    books.push_back(book);
+    Add_Book(book);
 
     author_id.name = "Joanne";
     author_id.surname = "Rowling";
     genre = FANTASY;
     name = "Harry Potter: Second Book";
     book = PhysBook(author_id, name, genre);
-    books.push_back(book);
+    Add_Book(book);
 
     author_id.name = "Joanne";
     author_id.surname = "Rowling";
     genre = FANTASY;
     name = "Harry Potter: Last Book";
     book = PhysBook(author_id, name, genre);
-    books.push_back(book);
+    Add_Book(book);
 
     author_id.name = "John";
     author_id.surname = "Smith";
     genre = DETECTIVE;
     name = "London Stories";
     book = PhysBook(author_id, name, genre);
-    books.push_back(book);
+    Add_Book(book);
     return;
 }
+#endif
 
 u32 PhysBook::global_book_id_counter = 0;
 int main()
@@ -311,6 +367,7 @@ int main()
     std::cout << "===========================================" << std::endl;
     Query q(AND, book);
     p.Interact_With_Lib(q, lib);
+    lib.Print();
     return 0;
 }
 

@@ -1,3 +1,5 @@
+#ifndef QUERY_H
+#define QUERY_H
 enum QueryType
 {
     UNDEFINED = 0,
@@ -15,3 +17,4 @@ struct Query
 };
 
 typedef u32 (*ValidateQueryFunction) (Query&, Book&);
+#endif // QUERY_H guard
